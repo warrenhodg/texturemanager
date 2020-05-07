@@ -36,7 +36,7 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
 
     // Generics magic to allow a HashMap to use String as a key
     // while allowing it to use &str for gets
-    pub fn load<D>(&mut self, details: &D) -> Result<Rc<R>, String>
+    pub fn load<D>(&mut self, details: &D, name: &D) -> Result<Rc<R>, String>
         where L: ResourceLoader<'l, R, Args = D>,
               D: Eq + Hash + ?Sized,
               K: Borrow<D> + for<'a> From<&'a D>
@@ -45,7 +45,7 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
             .get(details)
             .cloned()
             .map_or_else(|| {
-                             let resource = Rc::new(self.loader.load(details)?);
+                             let resource = Rc::new(self.loader.load(name)?);
                              self.cache.insert(details.into(), resource.clone());
                              Ok(resource)
                          },
@@ -57,7 +57,6 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
 impl<'l, T> ResourceLoader<'l, Texture<'l>> for TextureCreator<T> {
     type Args = str;
     fn load(&'l self, path: &str) -> Result<Texture, String> {
-        println!("LOADED A TEXTURE");
         self.load_texture(path)
     }
 }
