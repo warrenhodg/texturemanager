@@ -1,54 +1,69 @@
+/*
+ * Extract from https://github.com/Rust-SDL2/rust-sdl2/blob/master/examples/resource-manager.rs
+ */
+
 extern crate sdl2;
 
-use std::collections::HashMap;
 use sdl2::image::LoadTexture;
-use sdl2::pixels::PixelFormatEnum;
-use sdl2::render::{Texture, TextureAccess, TextureCreator, TextureValueError};
+use sdl2::render::Texture;
+use sdl2::render::TextureCreator;
+use std::hash::Hash;
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::rc::Rc;
 
-pub struct TextureManager<'t> {
-    textures: HashMap<String, Texture<'t>>,
+pub type TextureManager<'l, T> = ResourceManager<'l, String, Texture<'l>, TextureCreator<T>>;
+
+// Generic struct to cache any resource loaded by a ResourceLoader
+pub struct ResourceManager<'l, K, R, L>
+    where K: Hash + Eq,
+          L: 'l + ResourceLoader<'l, R>
+{
+    loader: &'l L,
+    cache: HashMap<K, Rc<R>>,
 }
 
-impl <'t> TextureManager<'t> {
-    pub fn new() -> TextureManager<'t> {
-        TextureManager {
-            textures: HashMap::new(),
+impl<'l, K, R, L> ResourceManager<'l, K, R, L>
+    where K: Hash + Eq,
+          L: ResourceLoader<'l, R>
+{
+    pub fn new(loader: &'l L) -> Self {
+        ResourceManager {
+            cache: HashMap::new(),
+            loader: loader,
         }
     }
 
-    pub fn create_texture<T>(&mut self, texture_creator: &'static TextureCreator<T>, name: String, format: PixelFormatEnum, access: TextureAccess, width: u32, height: u32) -> Result<(), TextureValueError> { 
-        let texture_result = texture_creator.create_texture(format, access, width, height);
-
-        match texture_result {
-            Err(v) => return Err(v),
-            Ok(texture) => {
-                self.textures.insert(name, texture);
-                return Ok(())
-            }
-        }
-    }
-
-    pub fn load_texture<T>(&mut self, texture_creator: &'static TextureCreator<T>, name: String, filename: String) -> Result<(), String> {
-        let texture_result = texture_creator.load_texture(filename);
-
-        match texture_result {
-            Err(v) => return Err(v),
-            Ok(texture) => {
-                self.textures.insert(name, texture);
-                return Ok(())
-            }
-        }
-    }
-
-    pub fn texture(&mut self, name: String) -> Option<&mut Texture<'t>> {
-        self.textures.get_mut(&name)
+    // Generics magic to allow a HashMap to use String as a key
+    // while allowing it to use &str for gets
+    pub fn load<D>(&mut self, details: &D) -> Result<Rc<R>, String>
+        where L: ResourceLoader<'l, R, Args = D>,
+              D: Eq + Hash + ?Sized,
+              K: Borrow<D> + for<'a> From<&'a D>
+    {
+        self.cache
+            .get(details)
+            .cloned()
+            .map_or_else(|| {
+                             let resource = Rc::new(self.loader.load(details)?);
+                             self.cache.insert(details.into(), resource.clone());
+                             Ok(resource)
+                         },
+                         Ok)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+// TextureCreator knows how to load Textures
+impl<'l, T> ResourceLoader<'l, Texture<'l>> for TextureCreator<T> {
+    type Args = str;
+    fn load(&'l self, path: &str) -> Result<Texture, String> {
+        println!("LOADED A TEXTURE");
+        self.load_texture(path)
     }
+}
+
+// Generic trait to Load any Resource Kind
+pub trait ResourceLoader<'l, R> {
+    type Args: ?Sized;
+    fn load(&'l self, data: &Self::Args) -> Result<R, String>;
 }
