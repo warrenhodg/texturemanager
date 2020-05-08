@@ -18,7 +18,7 @@ use std::rc::Rc;
 // Generic trait to Load any Resource Kind
 pub trait ResourceLoader<'l, R> {
     type Args: ?Sized;
-    fn load(&'l self, data: &Self::Args) -> Result<R, String>;
+    fn load(&'l self, details: &Self::Args) -> Result<R, String>;
 }
 
 // Generic struct to cache any resource loaded by a ResourceLoader
@@ -53,11 +53,9 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
     //
     // Generics magic to allow a HashMap to use String as a key
     // while allowing it to use &str for gets
-    pub fn load<N, D>(&mut self, name: &N, details: &D) -> Result<Rc<R>, String>
+    pub fn load<D>(&mut self, name: &str, details: &D) -> Result<Rc<R>, String>
         where L: ResourceLoader<'l, R, Args = D>,
-              N: Eq + Hash,
-              K: Borrow<N> + for<'a> From<&'a N>,
-              D: ?Sized,
+              K: Borrow<str> + for<'a> From<&'a str>,
     {
         self.cache
             .get(name)
@@ -74,9 +72,8 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
     //
     // Generics magic to allow a HashMap to use String as a key
     // while allowing it to use &str for gets
-    pub fn add<N>(&mut self, name: &N, item: R) -> Result<Rc<R>, String>
-        where N: Eq + Hash,
-              K: Borrow<N> + for<'a> From<&'a N>,
+    pub fn add(&mut self, name: &str, item: R) -> Result<Rc<R>, String>
+        where K: Borrow<str> + for<'a> From<&'a str>,
     {
         self.cache
             .get(name)
@@ -90,10 +87,8 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
     }
 
     // get retrieves the specified resource from the HashMap
-    pub fn get<N, D>(&mut self, name: &N) -> Result<Rc<R>, String>
-        where L: ResourceLoader<'l, R, Args = D>,
-              N: Eq + Hash + Display,
-              K: Borrow<N> + for<'a> From<&'a N>,
+    pub fn get(&mut self, name: &str) -> Result<Rc<R>, String>
+        where K: Borrow<str> + for<'a> From<&'a str>,
     {
         match self
             .cache
@@ -107,7 +102,7 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
 }
 
 // TextureCreator knows how to load Textures
-impl<'l, T> ResourceLoader<'l, Texture<'l>> for TextureCreator<T> {
+impl<'l, R> ResourceLoader<'l, Texture<'l>> for TextureCreator<R> {
     type Args = str;
     fn load(&'l self, path: &str) -> Result<Texture, String> {
         self.load_texture(path)
@@ -118,7 +113,6 @@ impl<'l, T> ResourceLoader<'l, Texture<'l>> for TextureCreator<T> {
 impl<'l> ResourceLoader<'l, Font<'l, 'static>> for Sdl2TtfContext {
     type Args = FontDetails;
     fn load(&'l self, details: &FontDetails) -> Result<Font<'l, 'static>, String> {
-        println!("LOADED A FONT");
         self.load_font(&details.path, details.size)
     }
 }
