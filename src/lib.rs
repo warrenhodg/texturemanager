@@ -14,8 +14,11 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub type TextureManager<'l, T> = ResourceManager<'l, String, Texture<'l>, TextureCreator<T>>;
-type FontManager<'l> = ResourceManager<'l, FontDetails, Font<'l, 'static>, Sdl2TtfContext>;
+// Generic trait to Load any Resource Kind
+pub trait ResourceLoader<'l, R> {
+    type Args: ?Sized;
+    fn load(&'l self, data: &Self::Args) -> Result<R, String>;
+}
 
 // Generic struct to cache any resource loaded by a ResourceLoader
 pub struct ResourceManager<'l, K, R, L>
@@ -25,6 +28,13 @@ pub struct ResourceManager<'l, K, R, L>
     loader: &'l L,
     cache: HashMap<K, Rc<R>>,
 }
+
+// Manage textures
+pub type TextureManager<'l, T> = ResourceManager<'l, String, Texture<'l>, TextureCreator<T>>;
+
+// Manage fonts
+type FontManager<'l> = ResourceManager<'l, FontDetails, Font<'l, 'static>, Sdl2TtfContext>;
+
 
 impl<'l, K, R, L> ResourceManager<'l, K, R, L>
     where K: Hash + Eq,
@@ -54,6 +64,24 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
                          },
                          Ok)
     }
+    
+    // Generics magic to allow a HashMap to use String as a key
+    // while allowing it to use &str for gets
+    pub fn add<D>(&mut self, details: &D, item: R) -> Result<Rc<R>, String>
+        where L: ResourceLoader<'l, R, Args = D>,
+              D: Eq + Hash + ?Sized,
+              K: Borrow<D> + for<'a> From<&'a D>
+    {
+        self.cache
+            .get(details)
+            .cloned()
+            .map_or_else(|| {
+                             let resource = Rc::new(item);
+                             self.cache.insert(details.into(), resource.clone());
+                             Ok(resource)
+                         },
+                         Ok)
+    }
 }
 
 // TextureCreator knows how to load Textures
@@ -71,12 +99,6 @@ impl<'l> ResourceLoader<'l, Font<'l, 'static>> for Sdl2TtfContext {
         println!("LOADED A FONT");
         self.load_font(&details.path, details.size)
     }
-}
-
-// Generic trait to Load any Resource Kind
-pub trait ResourceLoader<'l, R> {
-    type Args: ?Sized;
-    fn load(&'l self, data: &Self::Args) -> Result<R, String>;
 }
 
 // Information needed to load a Font
