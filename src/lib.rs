@@ -9,6 +9,7 @@ use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use sdl2::ttf::{Font, Sdl2TtfContext};
 
+use std::borrow::Borrow;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::collections::HashMap;
@@ -52,16 +53,18 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
     //
     // Generics magic to allow a HashMap to use String as a key
     // while allowing it to use &str for gets
-    pub fn load<D>(&mut self, name: K, details: &D) -> Result<Rc<R>, String>
+    pub fn load<N, D>(&mut self, name: &N, details: &D) -> Result<Rc<R>, String>
         where L: ResourceLoader<'l, R, Args = D>,
+              N: Eq + Hash,
+              K: Borrow<N> + for<'a> From<&'a N>,
               D: ?Sized,
     {
         self.cache
-            .get(&name)
+            .get(name)
             .cloned()
             .map_or_else(|| {
                              let resource = Rc::new(self.loader.load(details)?);
-                             self.cache.insert(name, resource.clone());
+                             self.cache.insert(name.into(), resource.clone());
                              Ok(resource)
                          },
                          Ok)
@@ -71,28 +74,32 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
     //
     // Generics magic to allow a HashMap to use String as a key
     // while allowing it to use &str for gets
-    pub fn add<D>(&mut self, name: K, item: R) -> Result<Rc<R>, String>
+    pub fn add<N, D>(&mut self, name: &N, item: R) -> Result<Rc<R>, String>
         where L: ResourceLoader<'l, R, Args = D>,
+              N: Eq + Hash,
+              K: Borrow<N> + for<'a> From<&'a N>,
               D: Eq + Hash + Display + ?Sized,
     {
         self.cache
-            .get(&name)
+            .get(name)
             .cloned()
             .map_or_else(|| {
                              let resource = Rc::new(item);
-                             self.cache.insert(name, resource.clone());
+                             self.cache.insert(name.into(), resource.clone());
                              Ok(resource)
                          },
                          Ok)
     }
 
     // get retrieves the specified resource from the HashMap
-    pub fn get<D>(&mut self, name: K) -> Result<Rc<R>, String>
+    pub fn get<N, D>(&mut self, name: &N) -> Result<Rc<R>, String>
         where L: ResourceLoader<'l, R, Args = D>,
+              N: Eq + Hash + Display,
+              K: Borrow<N> + for<'a> From<&'a N>,
     {
         match self
             .cache
-            .get(&name)
+            .get(name)
             .cloned() {
             None => Err(format!("{} not found", name).to_string()),
             Some(v) => Ok(v),
