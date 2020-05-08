@@ -34,7 +34,7 @@ pub struct ResourceManager<'l, K, R, L>
 pub type TextureManager<'l, T> = ResourceManager<'l, String, Texture<'l>, TextureCreator<T>>;
 
 // Manage fonts
-type FontManager<'l> = ResourceManager<'l, FontDetails, Font<'l, 'static>, Sdl2TtfContext>;
+pub type FontManager<'l> = ResourceManager<'l, FontDetails, Font<'l, 'static>, Sdl2TtfContext>;
 
 
 impl<'l, K, R, L> ResourceManager<'l, K, R, L>
