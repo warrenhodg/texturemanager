@@ -74,11 +74,9 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
     //
     // Generics magic to allow a HashMap to use String as a key
     // while allowing it to use &str for gets
-    pub fn add<N, D>(&mut self, name: &N, item: R) -> Result<Rc<R>, String>
-        where L: ResourceLoader<'l, R, Args = D>,
-              N: Eq + Hash,
+    pub fn add<N>(&mut self, name: &N, item: R) -> Result<Rc<R>, String>
+        where N: Eq + Hash,
               K: Borrow<N> + for<'a> From<&'a N>,
-              D: Eq + Hash + Display + ?Sized,
     {
         self.cache
             .get(name)
