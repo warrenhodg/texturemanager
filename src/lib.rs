@@ -9,6 +9,7 @@ use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use sdl2::ttf::{Font, Sdl2TtfContext};
 
+use std::fmt::Display;
 use std::hash::Hash;
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -47,29 +48,34 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
         }
     }
 
+    // load is designed to use more specific load function to load the resource,
+    // and add it to the hashmap using the specified name.
+    //
     // Generics magic to allow a HashMap to use String as a key
     // while allowing it to use &str for gets
-    pub fn load<D>(&mut self, details: &D) -> Result<Rc<R>, String>
+    pub fn load<D>(&mut self, name: &D, details: &D) -> Result<Rc<R>, String>
         where L: ResourceLoader<'l, R, Args = D>,
-              D: Eq + Hash + ?Sized,
+              D: Eq + Hash + Display + ?Sized,
               K: Borrow<D> + for<'a> From<&'a D>
     {
         self.cache
-            .get(details)
+            .get(name)
             .cloned()
             .map_or_else(|| {
                              let resource = Rc::new(self.loader.load(details)?);
-                             self.cache.insert(details.into(), resource.clone());
+                             self.cache.insert(name.into(), resource.clone());
                              Ok(resource)
                          },
                          Ok)
     }
     
+    // add adds an externally created resource to the HashMap using the specified name
+    //
     // Generics magic to allow a HashMap to use String as a key
     // while allowing it to use &str for gets
     pub fn add<D>(&mut self, details: &D, item: R) -> Result<Rc<R>, String>
         where L: ResourceLoader<'l, R, Args = D>,
-              D: Eq + Hash + ?Sized,
+              D: Eq + Hash + Display + ?Sized,
               K: Borrow<D> + for<'a> From<&'a D>
     {
         self.cache
@@ -82,6 +88,19 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
                          },
                          Ok)
     }
+
+    // get retrieves the specified resource from the HashMap
+    pub fn get<D>(&mut self, name: &D) -> Result<Rc<R>, String>
+        where L: ResourceLoader<'l, R, Args = D>,
+              D: Eq + Hash + Display + ?Sized,
+              K: Borrow<D> + for<'a> From<&'a D>
+    {
+        match self.cache.get(name).cloned() {
+            None => Err(format!("{} not found", name).to_string()),
+            Some(v) => Ok(v),
+        }
+    }
+
 }
 
 // TextureCreator knows how to load Textures
