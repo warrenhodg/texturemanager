@@ -11,7 +11,6 @@ use sdl2::ttf::{Font, Sdl2TtfContext};
 
 use std::fmt::Display;
 use std::hash::Hash;
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -23,7 +22,7 @@ pub trait ResourceLoader<'l, R> {
 
 // Generic struct to cache any resource loaded by a ResourceLoader
 pub struct ResourceManager<'l, K, R, L>
-    where K: Hash + Eq,
+    where K: Hash + Display + Eq,
           L: 'l + ResourceLoader<'l, R>
 {
     loader: &'l L,
@@ -38,7 +37,7 @@ pub type FontManager<'l> = ResourceManager<'l, FontDetails, Font<'l, 'static>, S
 
 
 impl<'l, K, R, L> ResourceManager<'l, K, R, L>
-    where K: Hash + Eq,
+    where K: Hash + Display + Eq,
           L: ResourceLoader<'l, R>
 {
     pub fn new(loader: &'l L) -> Self {
@@ -53,17 +52,16 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
     //
     // Generics magic to allow a HashMap to use String as a key
     // while allowing it to use &str for gets
-    pub fn load<D>(&mut self, name: &D, details: &D) -> Result<Rc<R>, String>
+    pub fn load<D>(&mut self, name: K, details: &D) -> Result<Rc<R>, String>
         where L: ResourceLoader<'l, R, Args = D>,
-              D: Eq + Hash + Display + ?Sized,
-              K: Borrow<D> + for<'a> From<&'a D>
+              D: Eq + Hash + ?Sized,
     {
         self.cache
-            .get(name)
+            .get(&name)
             .cloned()
             .map_or_else(|| {
                              let resource = Rc::new(self.loader.load(details)?);
-                             self.cache.insert(name.into(), resource.clone());
+                             self.cache.insert(name, resource.clone());
                              Ok(resource)
                          },
                          Ok)
@@ -73,29 +71,29 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
     //
     // Generics magic to allow a HashMap to use String as a key
     // while allowing it to use &str for gets
-    pub fn add<D>(&mut self, details: &D, item: R) -> Result<Rc<R>, String>
+    pub fn add<D>(&mut self, name: K, item: R) -> Result<Rc<R>, String>
         where L: ResourceLoader<'l, R, Args = D>,
               D: Eq + Hash + Display + ?Sized,
-              K: Borrow<D> + for<'a> From<&'a D>
     {
         self.cache
-            .get(details)
+            .get(&name)
             .cloned()
             .map_or_else(|| {
                              let resource = Rc::new(item);
-                             self.cache.insert(details.into(), resource.clone());
+                             self.cache.insert(name, resource.clone());
                              Ok(resource)
                          },
                          Ok)
     }
 
     // get retrieves the specified resource from the HashMap
-    pub fn get<D>(&mut self, name: &D) -> Result<Rc<R>, String>
+    pub fn get<D>(&mut self, name: K) -> Result<Rc<R>, String>
         where L: ResourceLoader<'l, R, Args = D>,
-              D: Eq + Hash + Display + ?Sized,
-              K: Borrow<D> + for<'a> From<&'a D>
     {
-        match self.cache.get(name).cloned() {
+        match self
+            .cache
+            .get(&name)
+            .cloned() {
             None => Err(format!("{} not found", name).to_string()),
             Some(v) => Ok(v),
         }
