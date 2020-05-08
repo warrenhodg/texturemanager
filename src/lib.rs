@@ -54,18 +54,20 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
     // Generics magic to allow a HashMap to use String as a key
     // while allowing it to use &str for gets
     pub fn load<D>(&mut self, name: &str, details: &D) -> Result<Rc<R>, String>
-        where L: ResourceLoader<'l, R, Args = D>,
-              K: Borrow<str> + for<'a> From<&'a str>,
+        where 
+            D: ?Sized,
+            L: ResourceLoader<'l, R, Args = D>,
+            K: Borrow<str> + for<'a> From<&'a str>,
     {
         self.cache
             .get(name)
             .cloned()
             .map_or_else(|| {
-                             let resource = Rc::new(self.loader.load(details)?);
-                             self.cache.insert(name.into(), resource.clone());
-                             Ok(resource)
-                         },
-                         Ok)
+                let resource = Rc::new(self.loader.load(details)?);
+                self.cache.insert(name.into(), resource.clone());
+                Ok(resource)
+            },
+            Ok)
     }
     
     // add adds an externally created resource to the HashMap using the specified name
