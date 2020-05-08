@@ -33,7 +33,7 @@ pub struct ResourceManager<'l, K, R, L>
 pub type TextureManager<'l, T> = ResourceManager<'l, String, Texture<'l>, TextureCreator<T>>;
 
 // Manage fonts
-pub type FontManager<'l> = ResourceManager<'l, FontDetails, Font<'l, 'static>, Sdl2TtfContext>;
+pub type FontManager<'l> = ResourceManager<'l, String, Font<'l, 'static>, Sdl2TtfContext>;
 
 
 impl<'l, K, R, L> ResourceManager<'l, K, R, L>
@@ -54,7 +54,7 @@ impl<'l, K, R, L> ResourceManager<'l, K, R, L>
     // while allowing it to use &str for gets
     pub fn load<D>(&mut self, name: K, details: &D) -> Result<Rc<R>, String>
         where L: ResourceLoader<'l, R, Args = D>,
-              D: Eq + Hash + ?Sized,
+              D: ?Sized,
     {
         self.cache
             .get(&name)
